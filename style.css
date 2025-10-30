@@ -1,0 +1,67 @@
+:root{
+  --bg:#0b0c10;--panel:#121319;--panel-soft:#141923;--muted:#9aa3af;--text:#e8eaee;--accent:#60a5fa;
+  --chip-human:#34d399;--chip-ai:#f59e0b;--chip-system:#a78bfa;--border:#232839;--border-strong:#2b3246;--danger:#ef4444;
+  --summary-bg:#171d29;--summary-bg-hover:#1a2130;--summary-text:#eef2ff;--badge-bg:#0f1521;--good:#2bd576;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:24px;background:var(--bg);color:var(--text);
+  font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+h1{font-size:18px;margin:0 0 16px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 auto}
+input,button,select{
+  background:#0f1117;color:var(--text);border:1px solid var(--border);
+  border-radius:10px;padding:10px 12px;outline:none
+}
+button{cursor:pointer;transition:transform .05s ease,border-color .2s ease,background .2s ease}
+button:hover{transform:translateY(-1px);border-color:var(--accent)}
+button[disabled]{opacity:.6;cursor:not-allowed}
+.muted{color:var(--muted)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0;align-items:center}
+.sessions{margin-top:16px;display:grid;gap:10px}
+
+/* Rozwijki jaśniejsze */
+details.session{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--panel-soft)}
+details.session>summary{
+  list-style:none;padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;user-select:none;
+  font-weight:700;background:var(--summary-bg);color:var(--summary-text);border-bottom:1px solid var(--border-strong)
+}
+details.session[open]>summary{border-bottom-color:var(--border)}
+details.session>summary:hover{background:var(--summary-bg-hover)}
+details.session>summary:focus{outline:2px solid var(--accent);outline-offset:-2px;border-radius:10px}
+details.session>summary .chev{width:10px;height:10px;border-right:2px solid #a6b4d9;border-bottom:2px solid #a6b4d9;transform:rotate(-45deg);transition:transform .15s ease;margin-right:2px}
+details.session[open]>summary .chev{transform:rotate(45deg)}
+.badge{font-size:12px;color:#a6b4d9;background:var(--badge-bg);border:1px solid var(--border-strong);padding:4px 8px;border-radius:999px}
+.sid{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0e1422;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
+.messages{padding:12px 12px 14px;display:grid;gap:10px}
+.msg{border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#151b28;display:grid;gap:6px}
+.msg .head{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.type{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:800;padding:3px 8px;border-radius:999px;border:1px solid var(--border)}
+.type.human{background:rgba(52,211,153,.12);color:var(--chip-human)}
+.type.ai{background:rgba(245,158,11,.12);color:var(--chip-ai)}
+.type.system,.type.tool{background:rgba(167,139,250,.12);color:var(--chip-system)}
+.id{font-size:12px;color:var(--muted)}
+pre.content{margin:0;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0e1422;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+
+.status{margin-top:12px}
+.danger{color:var(--danger)}
+.footer{margin-top:16px;color:var(--muted);font-size:12px}
+.grow{flex:1 1 100%}
+.spacer{flex:1}
+
+/* 🔔 Plakietka nowych wiadomości */
+.notify-badge{
+  display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:999px;background:#101628
+}
+.dot{width:8px;height:8px;border-radius:999px;background:var(--good)}
+.count{font-weight:800}
+.pulse{animation:pulse 1.2s ease-out 3}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(43,213,118,.5)}
+  100%{box-shadow:0 0 0 14px rgba(43,213,118,0)}
+}
+
+/* 🚩 Wulgaryzmy */
+.flag{display:inline-flex;align-items:center;gap:6px;color:var(--danger);font-weight:800}
+.msg.bad{border-color:var(--danger)}
