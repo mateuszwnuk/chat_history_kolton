@@ -135,3 +135,29 @@ pre.content{ margin:0; white-space:pre-wrap; word-break:break-word; font-family:
   .kpis{ grid-template-columns:repeat(2,minmax(140px,1fr)) }
   .nav-controls{ min-width: auto }
 }
+
+/* --- Toast / badge --- */
+.toast{
+  position: fixed;
+  left: 50%;
+  bottom: 88px;                 /* nad przyciskiem 'Najnowsze' */
+  transform: translateX(-50%);
+  z-index: 70;
+  background: #101628;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 8px 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease, border-color .2s ease;
+}
+.toast.show{
+  opacity: 1;
+  transform: translateX(-50%) translateY(-4px);
+}
+.toast.ok{ border-color: rgba(43,213,118,.6); }
+.toast.warn{ border-color: rgba(245,158,11,.6); }
+.toast.err{ border-color: rgba(239,68,68,.7); }
+.hidden{ display: none !important; }
