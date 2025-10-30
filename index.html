@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Historia czatów z Supabase</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <h1>Historia czatów z Supabase → grupowanie wg <code>session_id</code></h1>
+
+  <div class="card">
+    <div class="row">
+      <input id="url" placeholder="SUPABASE_URL" />
+      <input id="key" placeholder="SUPABASE_ANON_KEY" />
+      <input id="table" placeholder="NAZWA TABELI" />
+    </div>
+
+    <div class="toolbar">
+      <button id="refresh">Odśwież</button>
+
+      <span class="spacer"></span>
+
+      <label class="muted"><input type="checkbox" id="autoToggle" checked style="vertical-align:middle;margin-right:6px;">Auto-odświeżanie</label>
+      <select id="intervalSelect" title="Interwał (sekundy)">
+        <option value="10">co 10 s</option>
+        <option value="20" selected>co 20 s</option>
+        <option value="30">co 30 s</option>
+        <option value="60">co 60 s</option>
+      </select>
+
+      <label class="muted"><input type="checkbox" id="notifToggle" checked style="vertical-align:middle;margin-right:6px;">Powiadomienia</label>
+      <label class="muted"><input type="checkbox" id="soundToggle" checked style="vertical-align:middle;margin-right:6px;">Dźwięk</label>
+      <label class="muted"><input type="checkbox" id="profanityToggle" checked style="vertical-align:middle;margin-right:6px;">Oznaczaj wulgaryzmy</label>
+      <button id="testNotify">Test</button>
+
+      <button id="expandAll" disabled>Rozwiń wszystkie</button>
+      <button id="collapseAll" disabled>Zwiń wszystkie</button>
+    </div>
+
+    <div class="toolbar" style="margin-top:10px">
+      <input id="search" class="grow" placeholder="Szukaj po treści lub session_id…" />
+      <select id="typeFilter" title="Filtr typu">
+        <option value="">Typ: wszystkie</option>
+        <option value="human">Tylko human</option>
+        <option value="ai">Tylko ai</option>
+        <option value="system">Tylko system</option>
+        <option value="tool">Tylko tool</option>
+      </select>
+
+      <div id="newBadge" class="notify-badge" style="display:none">
+        <span class="dot"></span>
+        <span>Nowe:</span>
+        <span class="count" id="newCount">0</span>
+      </div>
+
+      <div class="muted" id="lastUpdated">Ostatnia aktualizacja: —</div>
+    </div>
+
+    <div class="status muted" id="status">Ładowanie…</div>
+    <div class="sessions" id="sessions"></div>
+
+    <div class="footer">
+      Wskazówka: dla szybkości dodaj indeks: <code>CREATE INDEX ON chatmemories (session_id, id);</code>
+    </div>
+  </div>
+</body>
+</html>
