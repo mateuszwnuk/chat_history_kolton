@@ -87,3 +87,26 @@ button[disabled]{opacity:.6;cursor:not-allowed}
 .type.system,.type.tool{background:rgba(167,139,250,.12);color:var(--chip-system)}
 .id{font-size:12px;color:var(--muted)}
 pre.content{margin:0;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,monospace;background:#0e1422;border:1px solid var(--border);bord
+
+/* --- Skocz do najnowszej --- */
+.jump-btn{
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  z-index: 60;
+  background: #0f1117;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 10px 14px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  cursor: pointer;
+  transition: opacity .18s ease, transform .18s ease, border-color .2s ease;
+}
+.jump-btn:hover{ border-color: var(--accent); transform: translateY(-2px); }
+.jump-btn.hidden{ opacity: 0; pointer-events: none; transform: translateY(8px); }
+.jump-btn.pulse{ animation: jumpPulse .9s ease-out 1; }
+@keyframes jumpPulse {
+  0% { box-shadow: 0 0 0 0 rgba(96,165,250,.5); }
+  100% { box-shadow: 0 0 0 16px rgba(96,165,250,0); }
+}
