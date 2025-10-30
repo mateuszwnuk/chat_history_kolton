@@ -79,10 +79,30 @@ const $kpiAvg = document.getElementById('kpiAvg');
 const $statsNote = document.getElementById('statsNote');
 const $statsChartCanvas = document.getElementById('statsChart');
 
+// Toast
+const $toast = document.getElementById('toast');
+
 // ===== Pasek postępu =====
 let progressTimer=null;
 function progressStart(){ if($progressBar){ $progressBar.classList.add('active'); if(progressTimer) clearTimeout(progressTimer); } }
 function progressStop(){ if($progressBar){ progressTimer=setTimeout(()=> $progressBar.classList.remove('active'), 180); } }
+
+// ===== Toast / badge =====
+let toastTimer = null;
+function showToast(msg, kind='ok', timeoutMs=1600){
+  if(!$toast) return;
+  $toast.textContent = msg;
+  $toast.classList.remove('hidden','ok','warn','err','show');
+  $toast.classList.add(kind);
+  requestAnimationFrame(()=>{ $toast.classList.add('show'); });
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, timeoutMs);
+}
+function hideToast(){
+  if(!$toast) return;
+  $toast.classList.remove('show');
+  setTimeout(()=> $toast.classList.add('hidden'), 220);
+}
 
 // ===== Audio =====
 let audioCtx = null;
@@ -181,14 +201,12 @@ buildClient();
 async function fetchData(){
   createdAtAvailable = true;
   let data=null, error=null;
-  // spróbuj z created_at
   ({data, error} = await client
     .from(cfg.table)
     .select("id, session_id, message, created_at")
     .order("session_id",{ascending:true})
     .order("id",{ascending:true}));
   if(error){
-    // fallback bez created_at
     createdAtAvailable = false;
     ({data, error} = await client
       .from(cfg.table)
@@ -367,12 +385,13 @@ async function refreshData(){
     renderStats();
 
     $lastUpdated.textContent='Ostatnia aktualizacja: '+new Date().toLocaleTimeString();
-    $status.textContent='Gotowe.';
+    showToast('Gotowe','ok'); // zamiast stalego tekstu
     if($autoscrollToggle?.checked && wasNear) scrollToBottom(false);
     else updateJumpButtonVisibility();
   }catch(e){
     console.error(e);
     $status.textContent='Błąd: '+e.message;
+    showToast('Błąd: '+e.message,'err',2200);
   }finally{
     progressStop();
   }
@@ -404,7 +423,10 @@ function startRealtime(){
       }
     })
     .subscribe(status=>{
-      if(status==='SUBSCRIBED') $status.textContent='Realtime aktywne';
+      if(status==='SUBSCRIBED'){
+        $status.textContent='Realtime aktywne';
+        showToast('Realtime aktywne','ok');
+      }
     });
 }
 function stopRealtime(){
@@ -412,6 +434,7 @@ function stopRealtime(){
     client.removeChannel(realtimeChannel);
     realtimeChannel=null;
     $status.textContent='Realtime wyłączone';
+    showToast('Realtime wyłączone','warn');
   }
 }
 
@@ -437,18 +460,16 @@ async function applySettings(){
     table: ($tableInput.value||'').trim()
   };
   if(!newCfg.url || !newCfg.key || !newCfg.table){
-    alert('Uzupełnij wszystkie pola (URL, anon key, tabela).');
+    showToast('Uzupełnij URL/Key/Tabela','warn',2200);
     return;
   }
   saveConfig(newCfg);
   cfg = loadConfig();
-  // przebuduj klienta i odśwież
   stopRealtime(); stopAutoRefresh();
   buildClient();
-  // włącz ponownie auto-refresh jeśli było zaznaczone
   if($autoToggle.checked) startAutoRefresh();
   await refreshData();
-  alert('Zastosowano nowe ustawienia połączenia.');
+  showToast('Zastosowano ustawienia','ok');
 }
 
 // ===== Zdarzenia UI =====
@@ -457,7 +478,7 @@ $search.oninput = renderConversation;
 $typeFilter.onchange = renderConversation;
 $sessionSearch.oninput = renderSessions;
 
-$testNotify.onclick = async ()=>{ ensureAudioCtx(); playDing(); await ensureNotifPermission(); notifyNew(1); };
+$testNotify.onclick = async ()=>{ ensureAudioCtx(); playDing(); await ensureNotifPermission(); notifyNew(1); showToast('Test powiadomienia','ok'); };
 
 $realtimeToggle.onchange = e=>{
   if(e.target.checked){ stopAutoRefresh(); startRealtime(); }
@@ -469,7 +490,7 @@ $autoToggle.onchange = e=>{
 };
 $intervalSelect.onchange = ()=>{ if($autoToggle.checked) startAutoRefresh(); };
 
-$applySettings.onclick = applySettings;
+$applySettings?.addEventListener('click', applySettings);
 
 // Tabs
 $tabs.forEach(btn=>{
@@ -497,13 +518,9 @@ $tabs.forEach(btn=>{
 
 // ===== Start =====
 window.addEventListener('load', async ()=>{
-  // pokaż ustawienia w formularzu (dla przejrzystości)
   populateSettingsForm();
-
-  // domyślnie 10s i auto-refresh ON
   $intervalSelect.value='10';
   if($autoToggle.checked) startAutoRefresh();
-
   await refreshData();
   updateJumpButtonVisibility();
 });
