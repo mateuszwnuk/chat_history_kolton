@@ -3,116 +3,140 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Chat Dashboard – Supabase</title>
+  <title>Historia czatów z Supabase</title>
 
   <link rel="stylesheet" href="./style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="./app.js"></script>
 </head>
-
 <body>
-  <!-- NAV -->
-  <header class="topbar">
-    <div class="brand">🗂️ Chat Dashboard</div>
-    <nav class="tabs">
-      <a class="tab active" data-view="history">Historia czatów</a>
-      <a class="tab disabled" title="Wkrótce">Pulpit</a>
-      <a class="tab disabled" title="Wkrótce">Statystyki</a>
-      <a class="tab disabled" title="Wkrótce">Ustawienia</a>
-    </nav>
-  </header>
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <div class="brand">🧭 Panel</div>
+      <button class="tab active" data-tab="history">Historia czatów</button>
+      <button class="tab" data-tab="dashboard" disabled>Dashboard (wkrótce)</button>
+      <button class="tab" data-tab="stats" disabled>Statystyki (wkrótce)</button>
+      <button class="tab" data-tab="settings" disabled>Ustawienia (wkrótce)</button>
+    </div>
+    <div class="nav-right">
+      <span id="newBadge" class="notify-badge" style="display:none">
+        <span class="dot"></span>
+        <span>Nowe:</span>
+        <span class="count" id="newCount">0</span>
+      </span>
+    </div>
+  </nav>
 
-  <!-- GŁÓWNY LAYOUT -->
-  <main class="layout">
-    <!-- LEWA KOLUMNA — LISTA WĄTKÓW -->
-    <aside class="col-left">
-      <div class="card sticky">
-        <h2 class="section-title">Wątki</h2>
-        <div class="vspace-8"></div>
-        <input id="url" placeholder="SUPABASE_URL" />
-        <input id="key" placeholder="SUPABASE_ANON_KEY" />
-        <input id="table" placeholder="NAZWA TABELI" />
-        <div class="vspace-10"></div>
-        <input id="searchSessions" placeholder="🔍 Szukaj wątków i treści…" />
+  <!-- GŁÓWNY LAYOUT 2 kolumny -->
+  <div class="layout">
+    <!-- LEWA KOLUMNA: lista sesji -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="title">Wątki</div>
+        <input id="sessionSearch" placeholder="Szukaj po session_id…" />
       </div>
-
-      <div id="sessionList" class="session-list card"></div>
+      <div id="sessionList" class="session-list">
+        <!-- dynamicznie -->
+      </div>
+      <div class="sidebar-footer muted">
+        <div id="lastUpdated">Ostatnia aktualizacja: —</div>
+      </div>
     </aside>
 
-    <!-- PRAWA KOLUMNA — WYBRANY WĄTEK -->
-    <section class="col-right">
-      <div class="card toolbar-card">
-        <div class="toolbar-row">
-          <button id="refresh">🔄 Odśwież</button>
-          <div class="spacer"></div>
-
-          <label class="muted">
-            <input type="checkbox" id="realtimeToggle" checked>
-            Realtime
-          </label>
-
-          <div id="pollControls" class="poll-controls">
-            <label class="muted">
-              <input type="checkbox" id="autoToggle">
-              Auto-odświeżanie
-            </label>
-            <select id="intervalSelect" title="Interwał (sekundy)">
-              <option value="10">co 10 s</option>
-              <option value="20" selected>co 20 s</option>
-              <option value="30">co 30 s</option>
-              <option value="60">co 60 s</option>
-            </select>
-          </div>
-
-          <label class="muted">
-            <input type="checkbox" id="notifToggle" checked>
-            Powiadomienia
-          </label>
-          <label class="muted">
-            <input type="checkbox" id="soundToggle" checked>
-            Dźwięk
-          </label>
-          <label class="muted">
-            <input type="checkbox" id="profanityToggle" checked>
-            Oznaczaj wulgaryzmy
-          </label>
-
-          <button id="testNotify">🔔 Test</button>
-        </div>
-
-        <div class="toolbar-row">
-          <select id="typeFilter" title="Filtr typu">
-            <option value="">Typ: wszystkie</option>
-            <option value="human">Tylko human</option>
-            <option value="ai">Tylko ai</option>
-            <option value="system">Tylko system</option>
-            <option value="tool">Tylko tool</option>
-          </select>
-
-          <div id="newBadge" class="notify-badge" style="display:none">
-            <span class="dot"></span>
-            <span>Nowe:</span>
-            <span class="count" id="newCount">0</span>
-          </div>
-
-          <div class="muted" id="lastUpdated">Ostatnia aktualizacja: —</div>
-        </div>
-
-        <div class="status muted" id="status">Ładowanie…</div>
-      </div>
-
+    <!-- PRAWA KOLUMNA: widok rozmowy + narzędzia -->
+    <main class="main">
+      <!-- Ustawienia połączenia -->
       <div class="card">
-        <div id="currentSessionHeader" class="current-session-header">
-          <div class="mono">Sesja: <span id="currentSid">—</span></div>
-          <div class="muted" id="currentCount">0 wiadomości</div>
+        <div class="row">
+          <input id="url" placeholder="SUPABASE_URL" />
+          <input id="key" placeholder="SUPABASE_ANON_KEY" />
+          <input id="table" placeholder="NAZWA TABELI" />
         </div>
-        <div id="messages" class="messages"></div>
       </div>
 
-      <div class="card foot-hint">
-        💡 Wskazówka: dodaj indeks SQL: <code>CREATE INDEX ON chatmemories (session_id, id);</code>
+      <!-- Toolbar sterowania -->
+      <div class="card toolbar">
+        <button id="refresh">🔄 Odśwież</button>
+
+        <div class="bar-sep"></div>
+
+        <label class="muted">
+          <input type="checkbox" id="realtimeToggle" checked style="vertical-align:middle;margin-right:6px;">
+          Realtime
+        </label>
+
+        <span id="pollControls">
+          <label class="muted" style="margin-left:8px;">
+            <input type="checkbox" id="autoToggle" style="vertical-align:middle;margin-right:6px;">
+            Auto-odświeżanie
+          </label>
+          <select id="intervalSelect" title="Interwał (sekundy)">
+            <option value="10">co 10 s</option>
+            <option value="20" selected>co 20 s</option>
+            <option value="30">co 30 s</option>
+            <option value="60">co 60 s</option>
+          </select>
+        </span>
+
+        <div class="bar-sep"></div>
+
+        <label class="muted">
+          <input type="checkbox" id="notifToggle" checked style="vertical-align:middle;margin-right:6px;">
+          Powiadomienia
+        </label>
+        <label class="muted">
+          <input type="checkbox" id="soundToggle" checked style="vertical-align:middle;margin-right:6px;">
+          Dźwięk
+        </label>
+        <label class="muted">
+          <input type="checkbox" id="profanityToggle" checked style="vertical-align:middle;margin-right:6px;">
+          Oznaczaj wulgaryzmy
+        </label>
+        <button id="testNotify">🔔 Test</button>
       </div>
-    </section>
-  </main>
+
+      <!-- Filtry zawartości rozmowy -->
+      <div class="card toolbar">
+        <input id="search" class="grow" placeholder="🔍 Szukaj w wiadomościach (treść)…" />
+        <select id="typeFilter" title="Filtr typu">
+          <option value="">Typ: wszystkie</option>
+          <option value="human">Tylko human</option>
+          <option value="ai">Tylko ai</option>
+          <option value="system">Tylko system</option>
+          <option value="tool">Tylko tool</option>
+        </select>
+
+        <div class="bar-sep"></div>
+
+        <button id="expandAll" disabled>Rozwiń wszystkie</button>
+        <button id="collapseAll" disabled>Zwiń wszystkie</button>
+      </div>
+
+      <!-- Status -->
+      <div class="status muted" id="status">Ładowanie…</div>
+
+      <!-- ZAWARTOŚĆ SESJI -->
+      <section class="conversation card">
+        <header class="conv-header">
+          <div class="conv-title">
+            <span id="convFlag" class="flag hidden" title="Wulgaryzmy w wątku">⚠️</span>
+            <span>Sesja:</span>
+            <code id="activeSid">—</code>
+          </div>
+          <div class="conv-meta muted">
+            <span id="convCounts">—</span>
+          </div>
+        </header>
+
+        <!-- Lista wiadomości dla aktywnego wątku -->
+        <div id="messages" class="messages"></div>
+      </section>
+
+      <div class="footer muted">
+        💡 Wskazówka SQL: <code>CREATE INDEX ON chatmemories (session_id, id);</code>
+      </div>
+    </main>
+  </div>
 </body>
 </html>
