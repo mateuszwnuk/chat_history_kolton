@@ -7,7 +7,6 @@
 
   <link rel="stylesheet" href="./style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <!-- Chart.js do wykresu statystyk -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script defer src="./app.js"></script>
 </head>
@@ -15,16 +14,34 @@
   <!-- Pasek postępu -->
   <div id="progressBar" class="progress-bar"><span></span></div>
 
-  <!-- Nawigacja -->
+  <!-- NAVBAR (fixed + global controls) -->
   <nav class="navbar">
     <div class="nav-left">
       <div class="brand">🧭 Panel</div>
-      <button class="tab active" data-view="history">Historia czatów</button>
+      <button class="tab active" data-view="history">Historia</button>
       <button class="tab" data-view="stats">Statystyki</button>
-      <button class="tab" disabled>Dashboard</button>
-      <button class="tab" disabled>Ustawienia</button>
+      <button class="tab" data-view="settings">Ustawienia</button>
     </div>
-    <div class="nav-right">
+
+    <div class="nav-controls">
+      <button id="refresh" title="Odśwież">🔄</button>
+      <span class="bar-sep h"></span>
+
+      <label class="muted"><input type="checkbox" id="realtimeToggle"> Realtime</label>
+      <label class="muted"><input type="checkbox" id="autoToggle" checked> Auto-odświeżanie</label>
+      <select id="intervalSelect" title="Interwał">
+        <option value="10" selected>co 10 s</option>
+        <option value="20">co 20 s</option>
+        <option value="30">co 30 s</option>
+        <option value="60">co 60 s</option>
+      </select>
+      <span class="bar-sep h"></span>
+
+      <label class="muted"><input type="checkbox" id="notifToggle" checked> Powiadomienia</label>
+      <label class="muted"><input type="checkbox" id="soundToggle" checked> Dźwięk</label>
+      <label class="muted"><input type="checkbox" id="autoscrollToggle" checked> Auto-scroll</label>
+      <button id="testNotify" title="Test powiadomienia">🔔</button>
+
       <span id="newBadge" class="notify-badge" style="display:none">
         <span class="dot"></span><span>Nowe:</span><span class="count" id="newCount">0</span>
       </span>
@@ -47,43 +64,19 @@
       </div>
     </aside>
 
-    <!-- PRAWA kolumna -->
+    <!-- Prawa kolumna: widoki -->
     <main class="main">
-      <!-- Widok: HISTORIA -->
+      <!-- HISTORIA -->
       <div id="historyView">
-        <div class="card">
-          <div class="row">
-            <input id="url" placeholder="SUPABASE_URL" />
-            <input id="key" placeholder="SUPABASE_ANON_KEY" />
-            <input id="table" placeholder="NAZWA TABELI" />
-          </div>
-        </div>
-
-        <div class="card toolbar">
-          <button id="refresh">🔄 Odśwież</button>
-          <label class="muted"><input type="checkbox" id="realtimeToggle" style="margin-right:6px;">Realtime</label>
-          <label class="muted"><input type="checkbox" id="autoToggle" checked style="margin-right:6px;">Auto-odświeżanie</label>
-          <select id="intervalSelect">
-            <option value="10" selected>co 10 s</option>
-            <option value="20">co 20 s</option>
-            <option value="30">co 30 s</option>
-            <option value="60">co 60 s</option>
-          </select>
-          <label class="muted"><input type="checkbox" id="notifToggle" checked style="margin-right:6px;">Powiadomienia</label>
-          <label class="muted"><input type="checkbox" id="soundToggle" checked style="margin-right:6px;">Dźwięk</label>
-          <button id="testNotify">🔔 Test</button>
-        </div>
-
         <div class="card toolbar">
           <input id="search" class="grow" placeholder="🔍 Szukaj w wiadomościach…" />
-          <select id="typeFilter">
+          <select id="typeFilter" title="Filtr typu">
             <option value="">Typ: wszystkie</option>
             <option value="human">human</option>
             <option value="ai">ai</option>
             <option value="system">system</option>
             <option value="tool">tool</option>
           </select>
-          <label class="muted"><input type="checkbox" id="autoscrollToggle" checked style="margin-right:6px;">Auto-scroll</label>
         </div>
 
         <div class="status muted" id="status">Ładowanie…</div>
@@ -100,30 +93,15 @@
         </section>
       </div>
 
-      <!-- Widok: STATYSTYKI -->
+      <!-- STATYSTYKI -->
       <div id="statsView" class="hidden">
         <div class="card">
           <div class="kpis">
-            <div class="kpi">
-              <div class="kpi-label">Wiadomości (łącznie)</div>
-              <div class="kpi-value" id="kpiTotal">—</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Wątki (session_id)</div>
-              <div class="kpi-value" id="kpiThreads">—</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Human</div>
-              <div class="kpi-value" id="kpiHuman">—</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">AI</div>
-              <div class="kpi-value" id="kpiAI">—</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Śr. msg / wątek</div>
-              <div class="kpi-value" id="kpiAvg">—</div>
-            </div>
+            <div class="kpi"><div class="kpi-label">Wiadomości (łącznie)</div><div class="kpi-value" id="kpiTotal">—</div></div>
+            <div class="kpi"><div class="kpi-label">Wątki (session_id)</div><div class="kpi-value" id="kpiThreads">—</div></div>
+            <div class="kpi"><div class="kpi-label">Human</div><div class="kpi-value" id="kpiHuman">—</div></div>
+            <div class="kpi"><div class="kpi-label">AI</div><div class="kpi-value" id="kpiAI">—</div></div>
+            <div class="kpi"><div class="kpi-label">Śr. msg / wątek</div><div class="kpi-value" id="kpiAvg">—</div></div>
           </div>
         </div>
 
@@ -133,8 +111,23 @@
             <span id="statsNote" class="muted" style="margin-left:auto;">—</span>
           </div>
           <div class="chart-wrap">
-  <canvas id="statsChart"></canvas>
-</div>
+            <canvas id="statsChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- USTAWIENIA -->
+      <div id="settingsView" class="hidden">
+        <div class="card">
+          <div class="row">
+            <input id="url" placeholder="SUPABASE_URL" />
+            <input id="key" placeholder="SUPABASE_ANON_KEY" />
+            <input id="table" placeholder="NAZWA TABELI" />
+          </div>
+          <div class="row" style="justify-content:flex-end;">
+            <button id="applySettings">Zastosuj</button>
+          </div>
+          <p class="muted" style="margin-top:8px;">Ustawienia są zapisywane w <code>localStorage</code>. Po „Zastosuj” klient Supabase zostanie przełączony, a dane odświeżone.</p>
         </div>
       </div>
     </main>
