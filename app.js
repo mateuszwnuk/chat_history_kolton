@@ -25,6 +25,7 @@ const $autoToggle=el('autoToggle'), $intervalSelect=el('intervalSelect');
 const $notifToggle=el('notifToggle'), $soundToggle=el('soundToggle'), $testNotify=el('testNotify');
 const $profanityToggle=el('profanityToggle');
 const $lastUpdated=el('lastUpdated'), $newBadge=el('newBadge'), $newCount=el('newCount');
+const $deleteThreadBtn = el('deleteThreadBtn');
 
 // Prefill
 $url.value=DEFAULTS.SUPABASE_URL;
@@ -92,6 +93,8 @@ function parseMessage(m){
 function groupBySession(rows){
   const map={};
   for(const r of rows){
+    // pomijamy rekordy oznaczone jako usunięte
+    if(r.deleted_at) continue;
     const sid=r.session_id??'—brak—';
     (map[sid]??=[]).push(r);
   }
@@ -113,6 +116,7 @@ function renderSessionList(){
 
   for(const sid of sids){
     const rows = sessionsMap[sid];
+    if(!rows || rows.length===0) continue; // ukryj wątki bez żywych wiadomości
     if(q && !sid.toLowerCase().includes(q)) continue;
 
     // Czy sesja ma wulgaryzmy?
@@ -122,7 +126,7 @@ function renderSessionList(){
       if(hasProfanity(msg.content||'')){ sessBad=true; break; }
     }
 
-    const item=document.createElement('button');
+    const item=document.createElement('div');
     item.className='session-item'+(sid===activeSid?' active':'');
     item.dataset.sid=sid;
     item.innerHTML=`
@@ -130,9 +134,21 @@ function renderSessionList(){
       <span class="session-id" title="${sid}">${sid}</span>
       <span class="session-meta">
         <span class="badge" title="Liczba wiadomości">${rows.length}</span>
+        <button class="session-del" title="Oznacz wątek jako usunięty">🗑</button>
       </span>
     `;
-    item.addEventListener('click', ()=> setActiveSession(sid));
+    // klik na nazwę – ustaw aktywny
+    item.addEventListener('click', (e)=>{
+      // ignoruj klik na koszu
+      if(e.target && e.target.classList.contains('session-del')) return;
+      setActiveSession(sid);
+    });
+    // obsługa kosza
+    item.querySelector('.session-del').addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      await softDeleteThread(sid);
+    });
+
     $sessionList.appendChild(item);
   }
 }
@@ -140,7 +156,7 @@ function renderSessionList(){
 // UI: prawa kolumna — wiadomości aktywnej sesji
 function renderConversation(){
   $messages.innerHTML='';
-  $expandAll.disabled = true; // w tym układzie nie używamy <details>, więc wyłączone
+  $expandAll.disabled = true; // w tym layoucie nie używamy <details>
   $collapseAll.disabled = true;
 
   if(!activeSid || !sessionsMap[activeSid]){
@@ -148,12 +164,14 @@ function renderConversation(){
     $convFlag.classList.add('hidden');
     $convCounts.textContent='—';
     $status.textContent='Wybierz wątek z listy po lewej.';
+    $deleteThreadBtn.disabled = true;
     return;
   }
 
-  const rows = sessionsMap[activeSid];
+  const rows = sessionsMap[activeSid] || [];
   $activeSid.textContent = activeSid;
   $convCounts.textContent = `wiadomości: ${rows.length}`;
+  $deleteThreadBtn.disabled = rows.length === 0;
 
   // Flaga wulgaryzmów
   let sessBad=false;
@@ -201,12 +219,13 @@ function setActiveSession(sid){
   renderConversation();
 }
 
-// Pobierz wszystkie
+// Pobierz wszystkie (ignorując soft-deleted)
 async function fetchAllRows(){
   const table=$table.value.trim(); if(!table) throw new Error('Podaj nazwę tabeli.');
   const {data,error}=await client
     .from(table)
-    .select('id, session_id, message')
+    .select('id, session_id, message, deleted_at')
+    .is('deleted_at', null) // bierzemy tylko nieusunięte
     .order('session_id',{ascending:true})
     .order('id',{ascending:true})
     .limit(5000);
@@ -228,7 +247,6 @@ async function loadAndRender(){
     rawRows=newData; sessionsMap=groupBySession(rawRows);
     renderSessionList();
     if(!activeSid){
-      // ustaw pierwszy wątek jako aktywny
       const firstSid = Object.keys(sessionsMap).sort()[0];
       if(firstSid) activeSid=firstSid;
     }
@@ -249,7 +267,39 @@ async function loadAndRender(){
   }
 }
 
-// Realtime
+// SOFT DELETE całego wątku (oznacz wszystkie rekordy sesji)
+async function softDeleteThread(sid){
+  if(!sid) return;
+  const table = $table.value.trim();
+  const confirmMsg = `Oznaczyć wątek "${sid}" jako usunięty?\nUstawimy deleted_at na wszystkich rekordach tej sesji.`;
+  if(!window.confirm(confirmMsg)) return;
+
+  try{
+    $status.textContent = 'Oznaczam wątek jako usunięty…';
+    const nowIso = new Date().toISOString();
+
+    const { error } = await client
+      .from(table)
+      .update({ deleted_at: nowIso })
+      .eq('session_id', sid);
+
+    if(error) throw error;
+
+    // Lokalnie wytnij z mapy i widoku
+    delete sessionsMap[sid];
+    if(activeSid === sid){
+      activeSid = Object.keys(sessionsMap).sort()[0] || null;
+    }
+    renderSessionList();
+    renderConversation();
+    $status.textContent = 'Wątek oznaczony jako usunięty.';
+  }catch(e){
+    console.error(e);
+    $status.innerHTML = `<span class="danger">Błąd soft-delete: ${e.message}</span>`;
+  }
+}
+
+// Realtime (domyślnie OFF, bo mamy auto-refresh 60s)
 function unsubscribeRealtime(){
   if(realtimeChannel){ client.removeChannel(realtimeChannel); realtimeChannel=null; }
 }
@@ -260,15 +310,13 @@ function subscribeRealtime(){
     .channel('realtime-chatmemories')
     .on('postgres_changes', { event:'INSERT', schema:'public', table }, payload=>{
       const row = payload.new;
-      // dopisz do map
+      if(row.deleted_at) return; // ignoruj jeśli już soft-deleted
       const sid=row.session_id ?? '—brak—';
       if(!sessionsMap[sid]) sessionsMap[sid]=[];
       sessionsMap[sid].push(row);
       sessionsMap[sid].sort((a,b)=>(a.id??0)-(b.id??0));
 
-      // aktualizuj listę po lewej
       renderSessionList();
-      // jeśli to aktywny wątek — pokaż wiadomość
       if(activeSid===sid) renderConversation();
 
       setLastUpdated();
@@ -283,7 +331,7 @@ function subscribeRealtime(){
 }
 
 // Polling
-function startAuto(){ stopAuto(); const sec=parseInt($intervalSelect.value,10)||20; autoTimer=setInterval(loadAndRender, sec*1000); $status.textContent=`Auto-odświeżanie aktywne (co ${sec}s)`; }
+function startAuto(){ stopAuto(); const sec=parseInt($intervalSelect.value,10)||60; autoTimer=setInterval(loadAndRender, sec*1000); $status.textContent=`Auto-odświeżanie aktywne (co ${sec}s)`; }
 function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } }
 
 // Events
@@ -296,24 +344,25 @@ $refresh.addEventListener('click', ()=>{ ensureAudioCtx(); loadAndRender(); });
 $testNotify.addEventListener('click', async ()=>{
   ensureAudioCtx(); playDing(); await ensureNotifPermission(); showNotification(1); bumpBadge(1); setTimeout(()=>resetBadge(), 1200);
 });
-
-$expandAll.addEventListener('click', ()=>{});   // nieużywane w tym layoucie
-$collapseAll.addEventListener('click', ()=>{}); // j.w.
+$deleteThreadBtn.addEventListener('click', async ()=>{
+  if(activeSid) await softDeleteThread(activeSid);
+});
 
 $realtimeToggle.addEventListener('change', ()=>{
   if($realtimeToggle.checked){ stopAuto(); subscribeRealtime(); $status.textContent='Realtime aktywne'; }
   else{ unsubscribeRealtime(); $status.textContent='Realtime wyłączone'; }
 });
-$autoToggle?.addEventListener('change', ()=> $autoToggle.checked ? startAuto() : stopAuto());
-$intervalSelect?.addEventListener('change', ()=>{ if($autoToggle?.checked) startAuto(); });
+$autoToggle.addEventListener('change', ()=> $autoToggle.checked ? startAuto() : stopAuto());
+$intervalSelect.addEventListener('change', ()=>{ if($autoToggle.checked) startAuto(); });
 
-// Start
+// Start – domyślnie: polling ON (60s), realtime OFF
 window.addEventListener('load', async ()=>{
   try{
     ensureClient();
     await loadAndRender();
     initialized = true;
-    if($realtimeToggle?.checked) subscribeRealtime();
+    if($autoToggle.checked) startAuto();
+    // $realtimeToggle.checked = false (domyślnie)
   }catch(e){
     console.error(e);
     $status.innerHTML=`<span class="danger">Błąd: ${e.message}</span>`;
