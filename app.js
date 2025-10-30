@@ -1,4 +1,4 @@
-// ✅ Twoje dane (możesz później przepiąć na ENV)
+// ✅ Twoje dane (możesz później przepiąć na ENV) 
 const DEFAULTS = {
   SUPABASE_URL: "https://kiecgkztsycuwplpbtbs.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpZWNna3p0c3ljdXdwbHBidGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4ODc2NDAsImV4cCI6MjA3NDQ2MzY0MH0.WnzO0OqMur8eoXWB8ZjNBtHEVAK-rKPNftNATerYGsM",
