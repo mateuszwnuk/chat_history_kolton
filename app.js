@@ -331,14 +331,15 @@ function renderStats(){
     }]
   };
   const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { ticks: { maxTicksLimit: 8 } },
-      y: { beginAtZero: true, precision: 0 }
-    }
-  };
+  responsive: true,
+  maintainAspectRatio: false,    // <- ważne przy stałej wysokości kontenera
+  animation: false,              // mniej migotania przy częstych odświeżeniach
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { maxTicksLimit: 8 } },
+    y: { beginAtZero: true, precision: 0 }
+  }
+};
   if(chart){ chart.data = data; chart.options = options; chart.update(); }
   else { chart = new Chart($statsChartCanvas.getContext('2d'), { type: 'line', data, options }); }
 }
