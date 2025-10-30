@@ -28,25 +28,23 @@
     </div>
   </nav>
 
-  <!-- GŁÓWNY LAYOUT 2 kolumny -->
+  <!-- LAYOUT 2 kolumny -->
   <div class="layout">
-    <!-- LEWA KOLUMNA: lista sesji -->
+    <!-- LEWA: lista sesji -->
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="title">Wątki</div>
         <input id="sessionSearch" placeholder="Szukaj po session_id…" />
       </div>
-      <div id="sessionList" class="session-list">
-        <!-- dynamicznie -->
-      </div>
+      <div id="sessionList" class="session-list"></div>
       <div class="sidebar-footer muted">
         <div id="lastUpdated">Ostatnia aktualizacja: —</div>
       </div>
     </aside>
 
-    <!-- PRAWA KOLUMNA: widok rozmowy + narzędzia -->
+    <!-- PRAWA: rozmowa + narzędzia -->
     <main class="main">
-      <!-- Ustawienia połączenia -->
+      <!-- Połączenie -->
       <div class="card">
         <div class="row">
           <input id="url" placeholder="SUPABASE_URL" />
@@ -62,20 +60,20 @@
         <div class="bar-sep"></div>
 
         <label class="muted">
-          <input type="checkbox" id="realtimeToggle" checked style="vertical-align:middle;margin-right:6px;">
+          <input type="checkbox" id="realtimeToggle" style="vertical-align:middle;margin-right:6px;">
           Realtime
         </label>
 
         <span id="pollControls">
           <label class="muted" style="margin-left:8px;">
-            <input type="checkbox" id="autoToggle" style="vertical-align:middle;margin-right:6px;">
+            <input type="checkbox" id="autoToggle" checked style="vertical-align:middle;margin-right:6px;">
             Auto-odświeżanie
           </label>
           <select id="intervalSelect" title="Interwał (sekundy)">
             <option value="10">co 10 s</option>
-            <option value="20" selected>co 20 s</option>
+            <option value="20">co 20 s</option>
             <option value="30">co 30 s</option>
-            <option value="60">co 60 s</option>
+            <option value="60" selected>co 60 s</option>
           </select>
         </span>
 
@@ -96,7 +94,7 @@
         <button id="testNotify">🔔 Test</button>
       </div>
 
-      <!-- Filtry zawartości rozmowy -->
+      <!-- Filtry + akcje rozmowy -->
       <div class="card toolbar">
         <input id="search" class="grow" placeholder="🔍 Szukaj w wiadomościach (treść)…" />
         <select id="typeFilter" title="Filtr typu">
@@ -116,7 +114,7 @@
       <!-- Status -->
       <div class="status muted" id="status">Ładowanie…</div>
 
-      <!-- ZAWARTOŚĆ SESJI -->
+      <!-- Zawartość rozmowy -->
       <section class="conversation card">
         <header class="conv-header">
           <div class="conv-title">
@@ -126,10 +124,10 @@
           </div>
           <div class="conv-meta muted">
             <span id="convCounts">—</span>
+            <button id="deleteThreadBtn" class="session-del" title="Oznacz wątek jako usunięty">🗑 Usuń wątek</button>
           </div>
         </header>
 
-        <!-- Lista wiadomości dla aktywnego wątku -->
         <div id="messages" class="messages"></div>
       </section>
 
