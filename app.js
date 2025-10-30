@@ -6,10 +6,13 @@ const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- Stan ---
 let sessions = {};          // { sid: [rows] }
+let rawRows = [];           // płaska lista (do statystyk)
 let seenIds = new Set();
 let activeSid = null;
 let autoTimer = null;
 let realtimeChannel = null;
+let chart = null;           // Chart.js instance
+let createdAtAvailable = true;
 
 // --- DOM ---
 const $sessionList   = document.getElementById("sessionList");
@@ -37,6 +40,20 @@ const $tableInput    = document.getElementById("table");
 const $autoscrollToggle = document.getElementById("autoscrollToggle");
 const $progressBar   = document.getElementById("progressBar");
 const $jumpBtn       = document.getElementById("jumpToBottom");
+
+// Nawigacja widoków
+const $tabs = [...document.querySelectorAll('.tab[data-view]')];
+const $historyView = document.getElementById('historyView');
+const $statsView = document.getElementById('statsView');
+
+// KPI pola
+const $kpiTotal = document.getElementById('kpiTotal');
+const $kpiThreads = document.getElementById('kpiThreads');
+const $kpiHuman = document.getElementById('kpiHuman');
+const $kpiAI = document.getElementById('kpiAI');
+const $kpiAvg = document.getElementById('kpiAvg');
+const $statsNote = document.getElementById('statsNote');
+const $statsChartCanvas = document.getElementById('statsChart');
 
 // --- Pasek postępu ---
 let progressTimer=null;
@@ -114,9 +131,8 @@ function scrollToBottom(smooth=true){
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
   });
 }
-
-// --- Pokazywanie / ukrywanie przycisku "Najnowsze" ---
 function updateJumpButtonVisibility(){
+  const $jumpBtn = document.getElementById("jumpToBottom");
   if(!$jumpBtn) return;
   const enabled = !$autoscrollToggle.checked;
   const near = isNearBottom();
@@ -124,33 +140,46 @@ function updateJumpButtonVisibility(){
 }
 let scrollTick=false;
 window.addEventListener('scroll', ()=>{
-  if(scrollTick) return;
-  scrollTick=true;
+  if(scrollTick) return; scrollTick=true;
   requestAnimationFrame(()=>{ updateJumpButtonVisibility(); scrollTick=false; });
 });
-$jumpBtn?.addEventListener('click', ()=>{
+document.getElementById('jumpToBottom')?.addEventListener('click', ()=>{
   scrollToBottom(true);
   updateJumpButtonVisibility();
 });
 
-// --- Pobieranie danych ---
+// --- Pobieranie danych (z created_at jeśli dostępne) ---
 async function fetchData(){
-  const {data,error}=await client
+  createdAtAvailable = true;
+  let data=null, error=null;
+  // Próba z created_at
+  ({data, error} = await client
     .from(TABLE)
-    .select("id, session_id, message")
+    .select("id, session_id, message, created_at")
     .order("session_id",{ascending:true})
-    .order("id",{ascending:true});
-  if(error) throw error;
+    .order("id",{ascending:true}));
+  if(error){
+    // fallback bez created_at
+    createdAtAvailable = false;
+    ({data, error} = await client
+      .from(TABLE)
+      .select("id, session_id, message")
+      .order("session_id",{ascending:true})
+      .order("id",{ascending:true}));
+    if(error) throw error;
+  }
+
+  rawRows = data || [];
 
   const grouped={};
-  for(const r of data||[]){
+  for(const r of rawRows){
     (grouped[r.session_id]??=[]).push(r);
     seenIds.add(r.id);
   }
   sessions=grouped;
 }
 
-// --- Render listy ---
+// --- Render lewego panelu ---
 function renderSessions(){
   const q=$sessionSearch.value.trim().toLowerCase();
   $sessionList.innerHTML='';
@@ -170,7 +199,7 @@ function renderSessions(){
   }
 }
 
-// --- Render rozmowy ---
+// --- Render rozmowy (historia) ---
 function renderConversation(){
   $messages.innerHTML='';
   if(!activeSid || !sessions[activeSid]){
@@ -219,13 +248,99 @@ function renderConversation(){
     ? `Poka­zano wiadomości: <b>${shown}</b> (łącznie w wątku: ${msgs.length}).`
     : 'Brak wyników dla filtrów.';
 
-  // Auto-scroll / widoczność przycisku
   if($autoscrollToggle?.checked){
     if(isNearBottom()) scrollToBottom(true);
-    $jumpBtn?.classList.add('hidden');
+    document.getElementById('jumpToBottom')?.classList.add('hidden');
   }else{
     updateJumpButtonVisibility();
   }
+}
+
+// --- Statystyki: KPI + wykres ---
+function computeStats(){
+  const total = rawRows.length;
+  const threads = Object.keys(sessions).length;
+
+  let human=0, ai=0;
+  for(const r of rawRows){
+    const t=(r.message?.type||'').toLowerCase();
+    if(t==='human') human++;
+    else if(t==='ai') ai++;
+  }
+  const avg = threads ? (total/threads) : 0;
+
+  // Time series (dzień po dniu, ostatnie 30 dni)
+  let series = null;
+  let note = "Źródło: kolumna created_at";
+
+  if(createdAtAvailable){
+    const counts = new Map();
+    for(const r of rawRows){
+      const dt = new Date(r.created_at);
+      if (isNaN(dt)) continue;
+      const key = dt.toISOString().slice(0,10); // YYYY-MM-DD
+      counts.set(key, (counts.get(key)||0)+1);
+    }
+    // zbuduj oś czasu 30 dni wstecz
+    const days = [];
+    const today = new Date(); today.setHours(0,0,0,0);
+    for(let i=29;i>=0;i--){
+      const d=new Date(today); d.setDate(today.getDate()-i);
+      const key=d.toISOString().slice(0,10);
+      days.push(key);
+    }
+    series = {
+      labels: days,
+      values: days.map(d=>counts.get(d)||0)
+    };
+  }else{
+    note = "Brak kolumny created_at – wykres ograniczony.";
+  }
+
+  return { total, threads, human, ai, avg, series, note };
+}
+
+function renderStats(){
+  const { total, threads, human, ai, avg, series, note } = computeStats();
+
+  $kpiTotal.textContent   = total.toString();
+  $kpiThreads.textContent = threads.toString();
+  $kpiHuman.textContent   = human.toString();
+  $kpiAI.textContent      = ai.toString();
+  $kpiAvg.textContent     = avg ? avg.toFixed(1) : "0.0";
+  $statsNote.textContent  = note;
+
+  if(!series){
+    // brak wykresu
+    if(chart){ chart.destroy(); chart=null; }
+    if($statsChartCanvas){
+      const ctx = $statsChartCanvas.getContext('2d');
+      ctx.clearRect(0,0,$statsChartCanvas.width,$statsChartCanvas.height);
+    }
+    return;
+  }
+
+  // Render / update Chart.js
+  const data = {
+    labels: series.labels,
+    datasets: [{
+      label: 'Wiadomości / dzień',
+      data: series.values,
+      tension: 0.25,
+      fill: true
+    }]
+  };
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { maxTicksLimit: 8 } },
+      y: { beginAtZero: true, precision: 0 }
+    }
+  };
+  if(chart){ chart.data = data; chart.options = options; chart.update(); }
+  else { chart = new Chart($statsChartCanvas.getContext('2d'), { type: 'line', data, options }); }
 }
 
 // --- Refresh całości ---
@@ -235,12 +350,15 @@ async function refreshData(){
     progressStart();
     $status.textContent='Ładowanie…';
     await fetchData();
+
     if(!activeSid){
       const first=Object.keys(sessions).sort()[0];
       if(first) activeSid=first;
     }
     renderSessions();
     renderConversation();
+    renderStats();
+
     $lastUpdated.textContent='Ostatnia aktualizacja: '+new Date().toLocaleTimeString();
     $status.textContent='Gotowe.';
     if($autoscrollToggle?.checked && wasNear) scrollToBottom(false);
@@ -260,20 +378,22 @@ function startRealtime(){
     .channel('realtime:chatmemories')
     .on('postgres_changes',{event:'INSERT',schema:'public',table:TABLE}, payload=>{
       const row=payload.new;
+      rawRows.push(row);
       (sessions[row.session_id]??=[]).push(row);
 
       if(activeSid===row.session_id) renderConversation();
       renderSessions();
+      renderStats();
 
       bumpBadge(1); playDing(); notifyNew(1);
 
       if($autoscrollToggle?.checked){
         scrollToBottom(true);
       }else{
-        // pokaż przycisk i delikatnie pulsuj
         updateJumpButtonVisibility();
-        if($jumpBtn && !$jumpBtn.classList.contains('hidden')){
-          $jumpBtn.classList.remove('pulse'); void $jumpBtn.offsetWidth; $jumpBtn.classList.add('pulse');
+        const btn=document.getElementById('jumpToBottom');
+        if(btn && !btn.classList.contains('hidden')){
+          btn.classList.remove('pulse'); void btn.offsetWidth; btn.classList.add('pulse');
         }
       }
     })
@@ -289,7 +409,7 @@ function stopRealtime(){
   }
 }
 
-// --- Auto-odświeżanie (domyślnie 10s) ---
+// --- Auto-refresh ---
 function startAutoRefresh(){
   clearInterval(autoTimer);
   const sec=parseInt($intervalSelect.value,10)||10;
@@ -299,6 +419,21 @@ function startAutoRefresh(){
 function stopAutoRefresh(){ clearInterval(autoTimer); autoTimer=null; }
 
 // --- Zdarzenia UI ---
+document.querySelectorAll('.tab[data-view]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const view = btn.dataset.view;
+    document.querySelectorAll('.tab[data-view]').forEach(b=>b.classList.toggle('active', b===btn));
+    if(view==='stats'){
+      $historyView.classList.add('hidden');
+      $statsView.classList.remove('hidden');
+      renderStats();
+    }else{
+      $statsView.classList.add('hidden');
+      $historyView.classList.remove('hidden');
+    }
+  });
+});
+
 $refresh.onclick = ()=>{ ensureAudioCtx(); refreshData(); };
 $search.oninput = renderConversation;
 $typeFilter.onchange = renderConversation;
@@ -319,8 +454,9 @@ $intervalSelect.onchange = ()=>{ if($autoToggle.checked) startAutoRefresh(); };
 // zapamiętywanie auto-scroll
 (function initAutoscrollPref(){
   const saved = localStorage.getItem('autoscroll');
-  if(saved!==null) $autoscrollToggle.checked = saved==='1';
-  $autoscrollToggle.addEventListener('change', ()=>{
+  const $autoscrollToggle = document.getElementById("autoscrollToggle");
+  if(saved!==null && $autoscrollToggle) $autoscrollToggle.checked = saved==='1';
+  $autoscrollToggle?.addEventListener('change', ()=>{
     localStorage.setItem('autoscroll', $autoscrollToggle.checked?'1':'0');
     updateJumpButtonVisibility();
   });
@@ -329,13 +465,13 @@ $intervalSelect.onchange = ()=>{ if($autoToggle.checked) startAutoRefresh(); };
 // --- Start ---
 window.addEventListener('load', async ()=>{
   // uzupełnij pola połączenia (dla czytelności w UI)
-  if($urlInput)   $urlInput.value   = SUPABASE_URL;
-  if($keyInput)   $keyInput.value   = SUPABASE_KEY;
-  if($tableInput) $tableInput.value = TABLE;
+  document.getElementById("url").value   = SUPABASE_URL;
+  document.getElementById("key").value   = SUPABASE_KEY;
+  document.getElementById("table").value = TABLE;
 
   // domyślnie 10s i auto-refresh ON
-  if($intervalSelect) $intervalSelect.value='10';
-  if($autoToggle && $autoToggle.checked) startAutoRefresh();
+  $intervalSelect.value='10';
+  if($autoToggle.checked) startAutoRefresh();
 
   await refreshData();
   updateJumpButtonVisibility();
