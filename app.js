@@ -10,7 +10,6 @@ let seenIds = new Set();
 let activeSid = null;
 let autoTimer = null;
 let realtimeChannel = null;
-let initialized = false;
 
 // --- DOM ---
 const $sessionList   = document.getElementById("sessionList");
@@ -37,19 +36,12 @@ const $keyInput      = document.getElementById("key");
 const $tableInput    = document.getElementById("table");
 const $autoscrollToggle = document.getElementById("autoscrollToggle");
 const $progressBar   = document.getElementById("progressBar");
+const $jumpBtn       = document.getElementById("jumpToBottom");
 
 // --- Pasek postępu ---
 let progressTimer=null;
-function progressStart(){
-  if(!$progressBar) return;
-  $progressBar.classList.add('active');
-  if(progressTimer) clearTimeout(progressTimer);
-}
-function progressStop(){
-  if(!$progressBar) return;
-  // delikatne opóźnienie, by uniknąć migotania przy krótkich operacjach
-  progressTimer = setTimeout(()=> $progressBar.classList.remove('active'), 180);
-}
+function progressStart(){ if($progressBar){ $progressBar.classList.add('active'); if(progressTimer) clearTimeout(progressTimer); } }
+function progressStop(){ if($progressBar){ progressTimer=setTimeout(()=> $progressBar.classList.remove('active'), 180); } }
 
 // --- Audio ---
 let audioCtx = null;
@@ -123,6 +115,24 @@ function scrollToBottom(smooth=true){
   });
 }
 
+// --- Pokazywanie / ukrywanie przycisku "Najnowsze" ---
+function updateJumpButtonVisibility(){
+  if(!$jumpBtn) return;
+  const enabled = !$autoscrollToggle.checked;
+  const near = isNearBottom();
+  $jumpBtn.classList.toggle('hidden', near || !enabled);
+}
+let scrollTick=false;
+window.addEventListener('scroll', ()=>{
+  if(scrollTick) return;
+  scrollTick=true;
+  requestAnimationFrame(()=>{ updateJumpButtonVisibility(); scrollTick=false; });
+});
+$jumpBtn?.addEventListener('click', ()=>{
+  scrollToBottom(true);
+  updateJumpButtonVisibility();
+});
+
 // --- Pobieranie danych ---
 async function fetchData(){
   const {data,error}=await client
@@ -168,6 +178,7 @@ function renderConversation(){
     $convCounts.textContent='—';
     $convFlag.classList.add('hidden');
     $status.textContent='Wybierz sesję z listy po lewej.';
+    updateJumpButtonVisibility();
     return;
   }
 
@@ -208,9 +219,12 @@ function renderConversation(){
     ? `Poka­zano wiadomości: <b>${shown}</b> (łącznie w wątku: ${msgs.length}).`
     : 'Brak wyników dla filtrów.';
 
-  // Auto-scroll po renderze (jeśli użytkownik jest przy dole lub wyraźnie tego oczekuje)
+  // Auto-scroll / widoczność przycisku
   if($autoscrollToggle?.checked){
     if(isNearBottom()) scrollToBottom(true);
+    $jumpBtn?.classList.add('hidden');
+  }else{
+    updateJumpButtonVisibility();
   }
 }
 
@@ -230,6 +244,7 @@ async function refreshData(){
     $lastUpdated.textContent='Ostatnia aktualizacja: '+new Date().toLocaleTimeString();
     $status.textContent='Gotowe.';
     if($autoscrollToggle?.checked && wasNear) scrollToBottom(false);
+    else updateJumpButtonVisibility();
   }catch(e){
     console.error(e);
     $status.textContent='Błąd: '+e.message;
@@ -246,10 +261,21 @@ function startRealtime(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:TABLE}, payload=>{
       const row=payload.new;
       (sessions[row.session_id]??=[]).push(row);
+
       if(activeSid===row.session_id) renderConversation();
       renderSessions();
+
       bumpBadge(1); playDing(); notifyNew(1);
-      if($autoscrollToggle?.checked) scrollToBottom(true);
+
+      if($autoscrollToggle?.checked){
+        scrollToBottom(true);
+      }else{
+        // pokaż przycisk i delikatnie pulsuj
+        updateJumpButtonVisibility();
+        if($jumpBtn && !$jumpBtn.classList.contains('hidden')){
+          $jumpBtn.classList.remove('pulse'); void $jumpBtn.offsetWidth; $jumpBtn.classList.add('pulse');
+        }
+      }
     })
     .subscribe(status=>{
       if(status==='SUBSCRIBED') $status.textContent='Realtime aktywne';
@@ -270,10 +296,7 @@ function startAutoRefresh(){
   autoTimer=setInterval(refreshData, sec*1000);
   $status.textContent=`Auto-odświeżanie aktywne (co ${sec}s)`;
 }
-function stopAutoRefresh(){
-  clearInterval(autoTimer);
-  autoTimer=null;
-}
+function stopAutoRefresh(){ clearInterval(autoTimer); autoTimer=null; }
 
 // --- Zdarzenia UI ---
 $refresh.onclick = ()=>{ ensureAudioCtx(); refreshData(); };
@@ -281,21 +304,16 @@ $search.oninput = renderConversation;
 $typeFilter.onchange = renderConversation;
 $sessionSearch.oninput = renderSessions;
 
-$testNotify.onclick = async ()=>{
-  ensureAudioCtx(); playDing();
-  await ensureNotifPermission(); notifyNew(1);
-};
+$testNotify.onclick = async ()=>{ ensureAudioCtx(); playDing(); await ensureNotifPermission(); notifyNew(1); };
 
 $realtimeToggle.onchange = e=>{
   if(e.target.checked){ stopAutoRefresh(); startRealtime(); }
   else{ stopRealtime(); }
 };
-
 $autoToggle.onchange = e=>{
   if(e.target.checked) startAutoRefresh();
   else stopAutoRefresh();
 };
-
 $intervalSelect.onchange = ()=>{ if($autoToggle.checked) startAutoRefresh(); };
 
 // zapamiętywanie auto-scroll
@@ -304,6 +322,7 @@ $intervalSelect.onchange = ()=>{ if($autoToggle.checked) startAutoRefresh(); };
   if(saved!==null) $autoscrollToggle.checked = saved==='1';
   $autoscrollToggle.addEventListener('change', ()=>{
     localStorage.setItem('autoscroll', $autoscrollToggle.checked?'1':'0');
+    updateJumpButtonVisibility();
   });
 })();
 
@@ -319,4 +338,5 @@ window.addEventListener('load', async ()=>{
   if($autoToggle && $autoToggle.checked) startAutoRefresh();
 
   await refreshData();
+  updateJumpButtonVisibility();
 });
