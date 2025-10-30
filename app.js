@@ -25,6 +25,7 @@ const $autoToggle=el('autoToggle'), $intervalSelect=el('intervalSelect');
 const $notifToggle=el('notifToggle'), $soundToggle=el('soundToggle'), $testNotify=el('testNotify');
 const $profanityToggle=el('profanityToggle');
 const $lastUpdated=el('lastUpdated'), $newBadge=el('newBadge'), $newCount=el('newCount');
+const $deleteThreadBtn = el('deleteThreadBtn');
 
 // Prefill
 $url.value=DEFAULTS.SUPABASE_URL;
@@ -133,10 +134,19 @@ function renderSessionList(){
       <span class="session-id" title="${sid}">${sid}</span>
       <span class="session-meta">
         <span class="badge" title="Liczba wiadomości">${rows.length}</span>
+        <button class="session-del" title="Oznacz wątek jako usunięty">🗑</button>
       </span>
     `;
-    item.addEventListener('click', ()=>{
+    // klik na nazwę – ustaw aktywny
+    item.addEventListener('click', (e)=>{
+      // ignoruj klik na koszu
+      if(e.target && e.target.classList.contains('session-del')) return;
       setActiveSession(sid);
+    });
+    // obsługa kosza
+    item.querySelector('.session-del').addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      await softDeleteThread(sid);
     });
 
     $sessionList.appendChild(item);
@@ -154,12 +164,14 @@ function renderConversation(){
     $convFlag.classList.add('hidden');
     $convCounts.textContent='—';
     $status.textContent='Wybierz wątek z listy po lewej.';
+    $deleteThreadBtn.disabled = true;
     return;
   }
 
   const rows = sessionsMap[activeSid] || [];
   $activeSid.textContent = activeSid;
   $convCounts.textContent = `wiadomości: ${rows.length}`;
+  $deleteThreadBtn.disabled = rows.length === 0;
 
   // Flaga wulgaryzmów
   let sessBad=false;
@@ -255,6 +267,38 @@ async function loadAndRender(){
   }
 }
 
+// SOFT DELETE całego wątku (oznacz wszystkie rekordy sesji)
+async function softDeleteThread(sid){
+  if(!sid) return;
+  const table = $table.value.trim();
+  const confirmMsg = `Oznaczyć wątek "${sid}" jako usunięty?\nUstawimy deleted_at na wszystkich rekordach tej sesji.`;
+  if(!window.confirm(confirmMsg)) return;
+
+  try{
+    $status.textContent = 'Oznaczam wątek jako usunięty…';
+    const nowIso = new Date().toISOString();
+
+    const { error } = await client
+      .from(table)
+      .update({ deleted_at: nowIso })
+      .eq('session_id', sid);
+
+    if(error) throw error;
+
+    // Lokalnie wytnij z mapy i widoku
+    delete sessionsMap[sid];
+    if(activeSid === sid){
+      activeSid = Object.keys(sessionsMap).sort()[0] || null;
+    }
+    renderSessionList();
+    renderConversation();
+    $status.textContent = 'Wątek oznaczony jako usunięty.';
+  }catch(e){
+    console.error(e);
+    $status.innerHTML = `<span class="danger">Błąd soft-delete: ${e.message}</span>`;
+  }
+}
+
 // Realtime (domyślnie OFF, bo mamy auto-refresh 60s)
 function unsubscribeRealtime(){
   if(realtimeChannel){ client.removeChannel(realtimeChannel); realtimeChannel=null; }
@@ -300,6 +344,10 @@ $refresh.addEventListener('click', ()=>{ ensureAudioCtx(); loadAndRender(); });
 $testNotify.addEventListener('click', async ()=>{
   ensureAudioCtx(); playDing(); await ensureNotifPermission(); showNotification(1); bumpBadge(1); setTimeout(()=>resetBadge(), 1200);
 });
+$deleteThreadBtn.addEventListener('click', async ()=>{
+  if(activeSid) await softDeleteThread(activeSid);
+});
+
 $realtimeToggle.addEventListener('change', ()=>{
   if($realtimeToggle.checked){ stopAuto(); subscribeRealtime(); $status.textContent='Realtime aktywne'; }
   else{ unsubscribeRealtime(); $status.textContent='Realtime wyłączone'; }
