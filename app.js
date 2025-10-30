@@ -1,10 +1,26 @@
-// --- Konfiguracja Supabase ---
-const SUPABASE_URL = "https://kiecgkztsycuwplpbtbs.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpZWNna3p0c3ljdXdwbHBidGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4ODc2NDAsImV4cCI6MjA3NDQ2MzY0MH0.WnzO0OqMur8eoXWB8ZjNBtHEVAK-rKPNftNATerYGsM";
-const TABLE = "chatmemories";
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ===== Konfiguracja / pamięć ustawień =====
+const DEFAULTS = {
+  url:  "https://kiecgkztsycuwplpbtbs.supabase.co",
+  key:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpZWNna3p0c3ljdXdwbHBidGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4ODc2NDAsImV4cCI6MjA3NDQ2MzY0MH0.WnzO0OqMur8eoXWB8ZjNBtHEVAK-rKPNftNATerYGsM",
+  table:"chatmemories"
+};
+function loadConfig(){
+  return {
+    url:   localStorage.getItem('sbUrl')   || DEFAULTS.url,
+    key:   localStorage.getItem('sbKey')   || DEFAULTS.key,
+    table: localStorage.getItem('sbTable') || DEFAULTS.table
+  };
+}
+function saveConfig({url,key,table}){
+  localStorage.setItem('sbUrl', url);
+  localStorage.setItem('sbKey', key);
+  localStorage.setItem('sbTable', table);
+}
 
-// --- Stan ---
+// ===== Stan aplikacji =====
+let client = null;
+let cfg = loadConfig();
+
 let sessions = {};          // { sid: [rows] }
 let rawRows = [];           // płaska lista (do statystyk)
 let seenIds = new Set();
@@ -14,39 +30,47 @@ let realtimeChannel = null;
 let chart = null;           // Chart.js instance
 let createdAtAvailable = true;
 
-// --- DOM ---
+// ===== DOM =====
 const $sessionList   = document.getElementById("sessionList");
 const $sessionSearch = document.getElementById("sessionSearch");
 const $messages      = document.getElementById("messages");
 const $status        = document.getElementById("status");
+
+// Navbar/global controls
 const $refresh       = document.getElementById("refresh");
 const $intervalSelect= document.getElementById("intervalSelect");
 const $autoToggle    = document.getElementById("autoToggle");
 const $realtimeToggle= document.getElementById("realtimeToggle");
 const $notifToggle   = document.getElementById("notifToggle");
 const $soundToggle   = document.getElementById("soundToggle");
+const $autoscrollToggle = document.getElementById("autoscrollToggle");
 const $testNotify    = document.getElementById("testNotify");
+const $newBadge      = document.getElementById("newBadge");
+const $newCount      = document.getElementById("newCount");
+
+// History view
 const $typeFilter    = document.getElementById("typeFilter");
 const $search        = document.getElementById("search");
 const $convFlag      = document.getElementById("convFlag");
 const $activeSidEl   = document.getElementById("activeSid");
 const $convCounts    = document.getElementById("convCounts");
 const $lastUpdated   = document.getElementById("lastUpdated");
-const $newBadge      = document.getElementById("newBadge");
-const $newCount      = document.getElementById("newCount");
-const $urlInput      = document.getElementById("url");
-const $keyInput      = document.getElementById("key");
-const $tableInput    = document.getElementById("table");
-const $autoscrollToggle = document.getElementById("autoscrollToggle");
 const $progressBar   = document.getElementById("progressBar");
 const $jumpBtn       = document.getElementById("jumpToBottom");
 
-// Nawigacja widoków
+// Settings view
+const $urlInput      = document.getElementById("url");
+const $keyInput      = document.getElementById("key");
+const $tableInput    = document.getElementById("table");
+const $applySettings = document.getElementById("applySettings");
+
+// Tabs / views
 const $tabs = [...document.querySelectorAll('.tab[data-view]')];
 const $historyView = document.getElementById('historyView');
 const $statsView = document.getElementById('statsView');
+const $settingsView = document.getElementById('settingsView');
 
-// KPI pola
+// KPI / chart
 const $kpiTotal = document.getElementById('kpiTotal');
 const $kpiThreads = document.getElementById('kpiThreads');
 const $kpiHuman = document.getElementById('kpiHuman');
@@ -55,12 +79,12 @@ const $kpiAvg = document.getElementById('kpiAvg');
 const $statsNote = document.getElementById('statsNote');
 const $statsChartCanvas = document.getElementById('statsChart');
 
-// --- Pasek postępu ---
+// ===== Pasek postępu =====
 let progressTimer=null;
 function progressStart(){ if($progressBar){ $progressBar.classList.add('active'); if(progressTimer) clearTimeout(progressTimer); } }
 function progressStop(){ if($progressBar){ progressTimer=setTimeout(()=> $progressBar.classList.remove('active'), 180); } }
 
-// --- Audio ---
+// ===== Audio =====
 let audioCtx = null;
 function ensureAudioCtx(){
   if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch{} }
@@ -79,7 +103,7 @@ function playDing(){
 }
 window.addEventListener('pointerdown', ensureAudioCtx, {once:true});
 
-// --- Powiadomienia ---
+// ===== Powiadomienia =====
 async function ensureNotifPermission(){
   if(!$notifToggle.checked) return false;
   if(!('Notification' in window)) return false;
@@ -100,7 +124,7 @@ function bumpBadge(by=1){
   $newBadge.style.display='inline-flex';
 }
 
-// --- Wulgaryzmy ---
+// ===== Wulgaryzmy =====
 const BAD_WORDS = [
   "kurw","chuj","huj","kutas","pizd","pierdol","pierdziel","jeb","zajeb",
   "spierdal","wypierdal","zapierdal","odpierdol","przejeb","dojeb","ujeb",
@@ -112,7 +136,7 @@ const hasBad = (t="")=>{
   return BAD_WORDS.some(w=>s.includes(w));
 };
 
-// --- Auto-scroll helpers ---
+// ===== Auto-scroll =====
 function isNearBottom(threshold=120){
   const scrollY = window.scrollY || window.pageYOffset;
   const viewport = window.innerHeight || document.documentElement.clientHeight;
@@ -132,7 +156,6 @@ function scrollToBottom(smooth=true){
   });
 }
 function updateJumpButtonVisibility(){
-  const $jumpBtn = document.getElementById("jumpToBottom");
   if(!$jumpBtn) return;
   const enabled = !$autoscrollToggle.checked;
   const near = isNearBottom();
@@ -143,18 +166,24 @@ window.addEventListener('scroll', ()=>{
   if(scrollTick) return; scrollTick=true;
   requestAnimationFrame(()=>{ updateJumpButtonVisibility(); scrollTick=false; });
 });
-document.getElementById('jumpToBottom')?.addEventListener('click', ()=>{
+$jumpBtn?.addEventListener('click', ()=>{
   scrollToBottom(true);
   updateJumpButtonVisibility();
 });
 
-// --- Pobieranie danych (z created_at jeśli dostępne) ---
+// ===== Klient Supabase =====
+function buildClient(){
+  client = window.supabase.createClient(cfg.url, cfg.key);
+}
+buildClient();
+
+// ===== Pobieranie danych =====
 async function fetchData(){
   createdAtAvailable = true;
   let data=null, error=null;
-  // Próba z created_at
+  // spróbuj z created_at
   ({data, error} = await client
-    .from(TABLE)
+    .from(cfg.table)
     .select("id, session_id, message, created_at")
     .order("session_id",{ascending:true})
     .order("id",{ascending:true}));
@@ -162,7 +191,7 @@ async function fetchData(){
     // fallback bez created_at
     createdAtAvailable = false;
     ({data, error} = await client
-      .from(TABLE)
+      .from(cfg.table)
       .select("id, session_id, message")
       .order("session_id",{ascending:true})
       .order("id",{ascending:true}));
@@ -170,7 +199,6 @@ async function fetchData(){
   }
 
   rawRows = data || [];
-
   const grouped={};
   for(const r of rawRows){
     (grouped[r.session_id]??=[]).push(r);
@@ -179,7 +207,7 @@ async function fetchData(){
   sessions=grouped;
 }
 
-// --- Render lewego panelu ---
+// ===== Render lewego panelu =====
 function renderSessions(){
   const q=$sessionSearch.value.trim().toLowerCase();
   $sessionList.innerHTML='';
@@ -199,7 +227,7 @@ function renderSessions(){
   }
 }
 
-// --- Render rozmowy (historia) ---
+// ===== Render rozmowy =====
 function renderConversation(){
   $messages.innerHTML='';
   if(!activeSid || !sessions[activeSid]){
@@ -250,13 +278,13 @@ function renderConversation(){
 
   if($autoscrollToggle?.checked){
     if(isNearBottom()) scrollToBottom(true);
-    document.getElementById('jumpToBottom')?.classList.add('hidden');
+    $jumpBtn?.classList.add('hidden');
   }else{
     updateJumpButtonVisibility();
   }
 }
 
-// --- Statystyki: KPI + wykres ---
+// ===== Statystyki =====
 function computeStats(){
   const total = rawRows.length;
   const threads = Object.keys(sessions).length;
@@ -269,10 +297,8 @@ function computeStats(){
   }
   const avg = threads ? (total/threads) : 0;
 
-  // Time series (dzień po dniu, ostatnie 30 dni)
   let series = null;
   let note = "Źródło: kolumna created_at";
-
   if(createdAtAvailable){
     const counts = new Map();
     for(const r of rawRows){
@@ -281,7 +307,6 @@ function computeStats(){
       const key = dt.toISOString().slice(0,10); // YYYY-MM-DD
       counts.set(key, (counts.get(key)||0)+1);
     }
-    // zbuduj oś czasu 30 dni wstecz
     const days = [];
     const today = new Date(); today.setHours(0,0,0,0);
     for(let i=29;i>=0;i--){
@@ -289,20 +314,15 @@ function computeStats(){
       const key=d.toISOString().slice(0,10);
       days.push(key);
     }
-    series = {
-      labels: days,
-      values: days.map(d=>counts.get(d)||0)
-    };
+    series = { labels: days, values: days.map(d=>counts.get(d)||0) };
   }else{
     note = "Brak kolumny created_at – wykres ograniczony.";
   }
-
   return { total, threads, human, ai, avg, series, note };
 }
 
 function renderStats(){
   const { total, threads, human, ai, avg, series, note } = computeStats();
-
   $kpiTotal.textContent   = total.toString();
   $kpiThreads.textContent = threads.toString();
   $kpiHuman.textContent   = human.toString();
@@ -311,40 +331,26 @@ function renderStats(){
   $statsNote.textContent  = note;
 
   if(!series){
-    // brak wykresu
     if(chart){ chart.destroy(); chart=null; }
-    if($statsChartCanvas){
-      const ctx = $statsChartCanvas.getContext('2d');
-      ctx.clearRect(0,0,$statsChartCanvas.width,$statsChartCanvas.height);
-    }
+    const ctx = $statsChartCanvas.getContext('2d');
+    ctx.clearRect(0,0,$statsChartCanvas.width,$statsChartCanvas.height);
     return;
   }
 
-  // Render / update Chart.js
   const data = {
     labels: series.labels,
-    datasets: [{
-      label: 'Wiadomości / dzień',
-      data: series.values,
-      tension: 0.25,
-      fill: true
-    }]
+    datasets: [{ label:'Wiadomości / dzień', data: series.values, tension:0.25, fill:true }]
   };
   const options = {
-  responsive: true,
-  maintainAspectRatio: false,    // <- ważne przy stałej wysokości kontenera
-  animation: false,              // mniej migotania przy częstych odświeżeniach
-  plugins: { legend: { display: false } },
-  scales: {
-    x: { ticks: { maxTicksLimit: 8 } },
-    y: { beginAtZero: true, precision: 0 }
-  }
-};
-  if(chart){ chart.data = data; chart.options = options; chart.update(); }
-  else { chart = new Chart($statsChartCanvas.getContext('2d'), { type: 'line', data, options }); }
+    responsive:true, maintainAspectRatio:false, animation:false,
+    plugins:{ legend:{ display:false } },
+    scales:{ x:{ ticks:{ maxTicksLimit:8 } }, y:{ beginAtZero:true, precision:0 } }
+  };
+  if(chart){ chart.data=data; chart.options=options; chart.update(); }
+  else { chart=new Chart($statsChartCanvas.getContext('2d'), { type:'line', data, options }); }
 }
 
-// --- Refresh całości ---
+// ===== Refresh całości =====
 async function refreshData(){
   const wasNear = isNearBottom();
   try{
@@ -372,12 +378,12 @@ async function refreshData(){
   }
 }
 
-// --- Realtime ---
+// ===== Realtime =====
 function startRealtime(){
   if(realtimeChannel) client.removeChannel(realtimeChannel);
   realtimeChannel = client
-    .channel('realtime:chatmemories')
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:TABLE}, payload=>{
+    .channel(`realtime:${cfg.table}`)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:cfg.table}, payload=>{
       const row=payload.new;
       rawRows.push(row);
       (sessions[row.session_id]??=[]).push(row);
@@ -392,9 +398,8 @@ function startRealtime(){
         scrollToBottom(true);
       }else{
         updateJumpButtonVisibility();
-        const btn=document.getElementById('jumpToBottom');
-        if(btn && !btn.classList.contains('hidden')){
-          btn.classList.remove('pulse'); void btn.offsetWidth; btn.classList.add('pulse');
+        if($jumpBtn && !$jumpBtn.classList.contains('hidden')){
+          $jumpBtn.classList.remove('pulse'); void $jumpBtn.offsetWidth; $jumpBtn.classList.add('pulse');
         }
       }
     })
@@ -410,7 +415,7 @@ function stopRealtime(){
   }
 }
 
-// --- Auto-refresh ---
+// ===== Auto-refresh =====
 function startAutoRefresh(){
   clearInterval(autoTimer);
   const sec=parseInt($intervalSelect.value,10)||10;
@@ -419,22 +424,34 @@ function startAutoRefresh(){
 }
 function stopAutoRefresh(){ clearInterval(autoTimer); autoTimer=null; }
 
-// --- Zdarzenia UI ---
-document.querySelectorAll('.tab[data-view]').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    const view = btn.dataset.view;
-    document.querySelectorAll('.tab[data-view]').forEach(b=>b.classList.toggle('active', b===btn));
-    if(view==='stats'){
-      $historyView.classList.add('hidden');
-      $statsView.classList.remove('hidden');
-      renderStats();
-    }else{
-      $statsView.classList.add('hidden');
-      $historyView.classList.remove('hidden');
-    }
-  });
-});
+// ===== Ustawienia (Supabase) =====
+function populateSettingsForm(){
+  if($urlInput)   $urlInput.value   = cfg.url;
+  if($keyInput)   $keyInput.value   = cfg.key;
+  if($tableInput) $tableInput.value = cfg.table;
+}
+async function applySettings(){
+  const newCfg = {
+    url:   ($urlInput.value||'').trim(),
+    key:   ($keyInput.value||'').trim(),
+    table: ($tableInput.value||'').trim()
+  };
+  if(!newCfg.url || !newCfg.key || !newCfg.table){
+    alert('Uzupełnij wszystkie pola (URL, anon key, tabela).');
+    return;
+  }
+  saveConfig(newCfg);
+  cfg = loadConfig();
+  // przebuduj klienta i odśwież
+  stopRealtime(); stopAutoRefresh();
+  buildClient();
+  // włącz ponownie auto-refresh jeśli było zaznaczone
+  if($autoToggle.checked) startAutoRefresh();
+  await refreshData();
+  alert('Zastosowano nowe ustawienia połączenia.');
+}
 
+// ===== Zdarzenia UI =====
 $refresh.onclick = ()=>{ ensureAudioCtx(); refreshData(); };
 $search.oninput = renderConversation;
 $typeFilter.onchange = renderConversation;
@@ -452,23 +469,36 @@ $autoToggle.onchange = e=>{
 };
 $intervalSelect.onchange = ()=>{ if($autoToggle.checked) startAutoRefresh(); };
 
+$applySettings.onclick = applySettings;
+
+// Tabs
+$tabs.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const view = btn.dataset.view;
+    $tabs.forEach(b=>b.classList.toggle('active', b===btn));
+    $historyView.classList.add('hidden');
+    $statsView.classList.add('hidden');
+    $settingsView.classList.add('hidden');
+    if(view==='history') $historyView.classList.remove('hidden');
+    if(view==='stats')   { $statsView.classList.remove('hidden'); renderStats(); }
+    if(view==='settings'){ $settingsView.classList.remove('hidden'); populateSettingsForm(); }
+  });
+});
+
 // zapamiętywanie auto-scroll
 (function initAutoscrollPref(){
   const saved = localStorage.getItem('autoscroll');
-  const $autoscrollToggle = document.getElementById("autoscrollToggle");
-  if(saved!==null && $autoscrollToggle) $autoscrollToggle.checked = saved==='1';
-  $autoscrollToggle?.addEventListener('change', ()=>{
+  if(saved!==null) $autoscrollToggle.checked = saved==='1';
+  $autoscrollToggle.addEventListener('change', ()=>{
     localStorage.setItem('autoscroll', $autoscrollToggle.checked?'1':'0');
     updateJumpButtonVisibility();
   });
 })();
 
-// --- Start ---
+// ===== Start =====
 window.addEventListener('load', async ()=>{
-  // uzupełnij pola połączenia (dla czytelności w UI)
-  document.getElementById("url").value   = SUPABASE_URL;
-  document.getElementById("key").value   = SUPABASE_KEY;
-  document.getElementById("table").value = TABLE;
+  // pokaż ustawienia w formularzu (dla przejrzystości)
+  populateSettingsForm();
 
   // domyślnie 10s i auto-refresh ON
   $intervalSelect.value='10';
