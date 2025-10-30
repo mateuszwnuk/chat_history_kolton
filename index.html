@@ -10,30 +10,28 @@
   <script defer src="./app.js"></script>
 </head>
 <body>
-  <!-- Pasek postępu (globalny) -->
+  <!-- Pasek postępu -->
   <div id="progressBar" class="progress-bar"><span></span></div>
 
-  <!-- NAVBAR -->
+  <!-- Nawigacja -->
   <nav class="navbar">
     <div class="nav-left">
       <div class="brand">🧭 Panel</div>
       <button class="tab active">Historia czatów</button>
-      <button class="tab" disabled>Dashboard (wkrótce)</button>
-      <button class="tab" disabled>Statystyki (wkrótce)</button>
-      <button class="tab" disabled>Ustawienia (wkrótce)</button>
+      <button class="tab" disabled>Dashboard</button>
+      <button class="tab" disabled>Statystyki</button>
+      <button class="tab" disabled>Ustawienia</button>
     </div>
     <div class="nav-right">
       <span id="newBadge" class="notify-badge" style="display:none">
-        <span class="dot"></span>
-        <span>Nowe:</span>
-        <span class="count" id="newCount">0</span>
+        <span class="dot"></span><span>Nowe:</span><span class="count" id="newCount">0</span>
       </span>
     </div>
   </nav>
 
-  <!-- LAYOUT 2 kolumny -->
+  <!-- Układ 2 kolumny -->
   <div class="layout">
-    <!-- LEWA: lista sesji (sticky) -->
+    <!-- Lewa kolumna -->
     <aside class="sidebar">
       <div class="sidebar-inner">
         <div class="sidebar-header">
@@ -47,9 +45,8 @@
       </div>
     </aside>
 
-    <!-- PRAWA: rozmowa + narzędzia -->
+    <!-- Prawa kolumna -->
     <main class="main">
-      <!-- Połączenie (pola uzupełniamy automatycznie w JS) -->
       <div class="card">
         <div class="row">
           <input id="url" placeholder="SUPABASE_URL" />
@@ -58,75 +55,31 @@
         </div>
       </div>
 
-      <!-- Toolbar sterowania -->
       <div class="card toolbar">
         <button id="refresh">🔄 Odśwież</button>
-
-        <div class="bar-sep"></div>
-
-        <label class="muted">
-          <input type="checkbox" id="realtimeToggle" style="vertical-align:middle;margin-right:6px;">
-          Realtime
-        </label>
-
-        <label class="muted">
-          <input type="checkbox" id="autoToggle" checked style="vertical-align:middle;margin-right:6px;">
-          Auto-odświeżanie
-        </label>
-        <select id="intervalSelect" title="Interwał (sekundy)">
-          <option value="10" selected>co 10 s</option>
-          <option value="20">co 20 s</option>
-          <option value="30">co 30 s</option>
-          <option value="60">co 60 s</option>
-        </select>
-
-        <div class="bar-sep"></div>
-
-        <label class="muted">
-          <input type="checkbox" id="notifToggle" checked style="vertical-align:middle;margin-right:6px;">
-          Powiadomienia
-        </label>
-        <label class="muted">
-          <input type="checkbox" id="soundToggle" checked style="vertical-align:middle;margin-right:6px;">
-          Dźwięk
-        </label>
-
+        <label class="muted"><input type="checkbox" id="realtimeToggle" style="margin-right:6px;">Realtime</label>
+        <label class="muted"><input type="checkbox" id="autoToggle" checked style="margin-right:6px;">Auto-odświeżanie</label>
+        <select id="intervalSelect"><option value="10" selected>co 10 s</option><option value="20">co 20 s</option><option value="30">co 30 s</option><option value="60">co 60 s</option></select>
+        <label class="muted"><input type="checkbox" id="notifToggle" checked style="margin-right:6px;">Powiadomienia</label>
+        <label class="muted"><input type="checkbox" id="soundToggle" checked style="margin-right:6px;">Dźwięk</label>
         <button id="testNotify">🔔 Test</button>
       </div>
 
-      <!-- Filtry + akcje rozmowy -->
       <div class="card toolbar">
         <input id="search" class="grow" placeholder="🔍 Szukaj w wiadomościach…" />
-        <select id="typeFilter" title="Filtr typu">
-          <option value="">Typ: wszystkie</option>
-          <option value="human">Tylko human</option>
-          <option value="ai">Tylko ai</option>
-          <option value="system">Tylko system</option>
-          <option value="tool">Tylko tool</option>
-        </select>
-
-        <div class="bar-sep"></div>
-
-        <label class="muted">
-          <input type="checkbox" id="autoscrollToggle" checked style="vertical-align:middle;margin-right:6px;">
-          Auto-scroll na dół
-        </label>
+        <select id="typeFilter"><option value="">Typ: wszystkie</option><option value="human">human</option><option value="ai">ai</option><option value="system">system</option><option value="tool">tool</option></select>
+        <label class="muted"><input type="checkbox" id="autoscrollToggle" checked style="margin-right:6px;">Auto-scroll</label>
       </div>
 
-      <!-- Status -->
       <div class="status muted" id="status">Ładowanie…</div>
 
-      <!-- Zawartość rozmowy -->
       <section class="conversation card">
         <header class="conv-header">
           <div class="conv-title">
-            <span id="convFlag" class="flag hidden" title="Wulgaryzmy w wątku">⚠️</span>
-            <span>Sesja:</span>
-            <code id="activeSid">—</code>
+            <span id="convFlag" class="flag hidden" title="Wulgaryzmy">⚠️</span>
+            <span>Sesja:</span> <code id="activeSid">—</code>
           </div>
-          <div class="conv-meta muted">
-            <span id="convCounts">—</span>
-          </div>
+          <div class="conv-meta muted"><span id="convCounts">—</span></div>
         </header>
         <div id="messages" class="messages"></div>
       </section>
