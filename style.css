@@ -71,7 +71,9 @@ body{
 .session-item > span{ display:flex; align-items:center; gap:6px }
 .session-id{ font-family:ui-monospace,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:210px }
 .session-bad{ color:var(--danger); font-weight:900; margin-right:4px }
-.badge{ font-size:12px; color:#a6b4d9; background:#101628; border:1px solid var(--border-strong); padding:2px 8px; border-radius:999px }
+.session-id{ max-width:180px }
+.session-bad{ color:var(--danger); font-weight:900; margin-right:4px }
+.badge{ font-size:12px; color:#a6b4d9; background:#101628; border:1px solid var(--border-strong); padding:4px 10px; border-radius:999px; min-width:34px; text-align:center }
 
 /* Main */
 .main{ display:flex; flex-direction:column; gap:20px; min-width:0 }
@@ -95,6 +97,7 @@ button[disabled]{ opacity:.6; cursor:not-allowed }
 .flag.hidden{ display:none }
 .messages{ padding:12px 0; display:grid; gap:10px }
 .msg{ border:1px solid var(--border); border-radius:12px; padding:10px 12px; background:#151b28; display:grid; gap:6px }
+.msg.bad{ border-color:var(--danger); box-shadow:0 0 0 3px rgba(239,68,68,0.06) inset; }
 .msg .head{ display:flex; gap:8px; align-items:center; justify-content:space-between }
 .type{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; font-weight:800; padding:3px 8px; border-radius:999px; border:1px solid var(--border) }
 .type.human{ background:rgba(52,211,153,.12); color:var(--chip-human) }
