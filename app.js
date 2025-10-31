@@ -78,6 +78,7 @@ const $kpiAI = document.getElementById('kpiAI');
 const $kpiAvg = document.getElementById('kpiAvg');
 const $statsNote = document.getElementById('statsNote');
 const $statsChartCanvas = document.getElementById('statsChart');
+const $topKeywords = document.getElementById('topKeywords');
 
 // Toast
 const $toast = document.getElementById('toast');
@@ -155,6 +156,14 @@ const hasBad = (t="")=>{
   const s=t.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
   return BAD_WORDS.some(w=>s.includes(w));
 };
+
+// --- Stopwords for keyword extraction (normalized, no diacritics)
+const STOP_WORDS = [
+  // Polish (basic/common)
+  'i','w','z','na','do','się','ze','że','to','jest','nie','si','po','dla','jak','co','ale','od','te','ten','ta','tak','albo','czy','aby','przez','ich','jego','jej','ten','oni','one','by','ma','mam','my','ty','on','ona',
+  // English small words
+  'the','and','for','with','that','this','from','have','has','was','are','you','your','not','but','what','when','where','who'
+];
 
 // ===== Auto-scroll =====
 function isNearBottom(threshold=120){
@@ -339,6 +348,29 @@ function computeStats(){
   return { total, threads, human, ai, avg, series, note };
 }
 
+// Compute top keywords used by HUMAN messages (returns array of {word,count})
+function computeTopKeywords(limit=10){
+  const freq = new Map();
+  for(const r of rawRows){
+    const t=(r.message?.type||'').toLowerCase();
+    if(t!=='human') continue;
+    const raw = (r.message?.content||'').toString();
+    // normalize and strip diacritics
+    const s = raw.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+    // keep letters/numbers as separators
+    const tokens = s.replace(/[^\p{L}\p{N}]+/gu,' ').split(/\s+/).filter(Boolean);
+    for(const w of tokens){
+      const w2 = w.replace(/^\W+|\W+$/g,'');
+      if(!w2) continue;
+      if(w2.length < 3) continue; // skip too-short tokens
+      if(STOP_WORDS.includes(w2)) continue;
+      freq.set(w2, (freq.get(w2)||0)+1);
+    }
+  }
+  const arr = Array.from(freq.entries()).sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([word,count])=>({word,count}));
+  return arr;
+}
+
 function renderStats(){
   const { total, threads, human, ai, avg, series, note } = computeStats();
   $kpiTotal.textContent   = total.toString();
@@ -366,6 +398,16 @@ function renderStats(){
   };
   if(chart){ chart.data=data; chart.options=options; chart.update(); }
   else { chart=new Chart($statsChartCanvas.getContext('2d'), { type:'line', data, options }); }
+
+  // Render top keywords
+  if($topKeywords){
+    const top = computeTopKeywords(10);
+    if(top.length===0){
+      $topKeywords.innerHTML = '<div class="muted">Brak danych</div>';
+    }else{
+      $topKeywords.innerHTML = top.map(k=>`<div class="keyword-item"><span class="kw">${k.word}</span><span class="kw-count">${k.count}</span></div>`).join('');
+    }
+  }
 }
 
 // ===== Refresh całości =====
