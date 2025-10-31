@@ -573,8 +573,10 @@ $tabs.forEach(btn=>{
 // ===== Start =====
 window.addEventListener('load', async ()=>{
   populateSettingsForm();
-  $intervalSelect.value='10';
-  if($autoToggle.checked) startAutoRefresh();
+  // Default interval to 60s and leave auto-refresh turned OFF by default
+  $intervalSelect.value='60';
+  $autoToggle.checked = false;
+  // Do not start auto-refresh automatically; user can enable it via the UI
   await refreshData();
   updateJumpButtonVisibility();
 });
