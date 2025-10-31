@@ -42,6 +42,10 @@ body{
 .nav-controls input[type="checkbox"]{ vertical-align:middle; margin-right:6px }
 .bar-sep.h{width:1px; height:26px; background:var(--border); margin:0 4px}
 
+.refresh-hint{ display:inline-flex; align-items:center; gap:6px; background: rgba(43,213,118,0.06); color: var(--good); border:1px solid rgba(43,213,118,0.12); padding:6px 8px; border-radius:999px; font-weight:700 }
+.refresh-hint.hidden{ opacity:0; transform: translateY(-2px); transition:opacity .18s, transform .18s; pointer-events:none }
+.status-header{ font-size:13px; color:var(--muted) }
+
 /* LAYOUT */
 .layout{
   display:grid; grid-template-columns: 330px 1fr; gap:16px;

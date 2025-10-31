@@ -34,7 +34,8 @@ let createdAtAvailable = true;
 const $sessionList   = document.getElementById("sessionList");
 const $sessionSearch = document.getElementById("sessionSearch");
 const $messages      = document.getElementById("messages");
-const $status        = document.getElementById("status");
+const $status        = document.getElementById("statusHeader");
+const $refreshHint   = document.getElementById('refreshHint');
 
 // Navbar/global controls
 const $refresh       = document.getElementById("refresh");
@@ -103,6 +104,16 @@ function hideToast(){
   if(!$toast) return;
   $toast.classList.remove('show');
   setTimeout(()=> $toast.classList.add('hidden'), 220);
+}
+
+// Subtle inline refresh hint (replaces the frequent "Gotowe" toast)
+let refreshHintTimer = null;
+function showRefreshHint(msg='Gotowe', timeoutMs=1400){
+  if(!$refreshHint) return;
+  $refreshHint.textContent = '✓ ' + msg;
+  $refreshHint.classList.remove('hidden');
+  if(refreshHintTimer) clearTimeout(refreshHintTimer);
+  refreshHintTimer = setTimeout(()=>{ $refreshHint.classList.add('hidden'); }, timeoutMs);
 }
 
 // ===== Audio =====
@@ -427,7 +438,8 @@ async function refreshData(){
     renderStats();
 
     $lastUpdated.textContent='Ostatnia aktualizacja: '+new Date().toLocaleTimeString();
-    showToast('Gotowe','ok'); // zamiast stalego tekstu
+    // Show subtle inline hint instead of toast for routine refreshes
+    showRefreshHint('Gotowe');
     if($autoscrollToggle?.checked && wasNear) scrollToBottom(false);
     else updateJumpButtonVisibility();
   }catch(e){
